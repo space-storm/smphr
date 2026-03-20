@@ -1,0 +1,114 @@
+---
+- name: Update Rocket.Chat
+  hosts: rocketchat
+  become: true
+  gather_facts: true
+
+  vars:
+    rocketchat_dir: /opt/rocketchat-compose
+    rocketchat_version: "8.0.1"
+    backup_env: true
+
+  tasks:
+    - name: Check Rocket.Chat directory exists
+      ansible.builtin.stat:
+        path: "{{ rocketchat_dir }}"
+      register: rc_dir
+
+    - name: Stop if Rocket.Chat directory is missing
+      ansible.builtin.fail:
+        msg: "Rocket.Chat directory {{ rocketchat_dir }} does not exist."
+      when: not rc_dir.stat.exists
+
+    - name: Check .env exists
+      ansible.builtin.stat:
+        path: "{{ rocketchat_dir }}/.env"
+      register: rc_env
+
+    - name: Stop if .env is missing
+      ansible.builtin.fail:
+        msg: ".env file not found at {{ rocketchat_dir }}/.env"
+      when: not rc_env.stat.exists
+
+    - name: Backup .env before update
+      ansible.builtin.copy:
+        src: "{{ rocketchat_dir }}/.env"
+        dest: "{{ rocketchat_dir }}/.env.backup-{{ ansible_date_time.iso8601_basic_short }}"
+        remote_src: true
+        mode: preserve
+      when: backup_env
+
+    - name: Set Rocket.Chat RELEASE in .env
+      ansible.builtin.lineinfile:
+        path: "{{ rocketchat_dir }}/.env"
+        regexp: '^RELEASE='
+        line: "RELEASE={{ rocketchat_version }}"
+        create: false
+
+    - name: Pull and restart Rocket.Chat stack
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - -f
+          - compose.database.yml
+          - -f
+          - compose.yml
+          - up
+          - -d
+      args:
+        chdir: "{{ rocketchat_dir }}"
+      register: compose_up
+      changed_when: >
+        'Pulling' in compose_up.stdout or
+        'Pulled' in compose_up.stdout or
+        'Recreating' in compose_up.stdout or
+        'Recreated' in compose_up.stdout or
+        'Starting' in compose_up.stdout or
+        'Started' in compose_up.stdout or
+        'Creating' in compose_up.stdout
+
+    - name: Show compose result
+      ansible.builtin.debug:
+        var: compose_up.stdout_lines
+
+    - name: Show Rocket.Chat container status
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - -f
+          - compose.database.yml
+          - -f
+          - compose.yml
+          - ps
+      args:
+        chdir: "{{ rocketchat_dir }}"
+      register: compose_ps
+      changed_when: false
+
+    - name: Print container status
+      ansible.builtin.debug:
+        var: compose_ps.stdout_lines
+
+    - name: Show recent Rocket.Chat logs
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - -f
+          - compose.database.yml
+          - -f
+          - compose.yml
+          - logs
+          - --tail=80
+          - rocketchat
+      args:
+        chdir: "{{ rocketchat_dir }}"
+      register: rc_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Print recent Rocket.Chat logs
+      ansible.builtin.debug:
+        var: rc_logs.stdout_lines
