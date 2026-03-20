@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars:
-    rocketchat_dir: /opt/rocketchat-compose
+    rocketchat_dir: /home/space/rocketchat-compose/
     rocketchat_version: "8.0.1"
     backup_env: true
 
