@@ -49,6 +49,8 @@ resource "proxmox_virtual_environment_vm" "openclaw" {
   }
 
   initialization {
+    datastore_id = var.datastore
+
     user_account {
       username = var.ci_user
       keys     = [var.ssh_public_key]
