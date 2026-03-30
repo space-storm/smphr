@@ -61,7 +61,7 @@ variable "disk_size" {
 
 variable "ci_user" {
   type    = string
-  default = "space"
+  default = "debian"
 }
 
 variable "ssh_public_key" {
